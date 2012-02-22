@@ -12,6 +12,35 @@ struct stream_deleter {
   }
 };
 
+std::string trim(const std::string s) {
+  std::string::const_iterator begin = s.begin();
+  std::string::const_iterator end = s.end();
+
+  for(begin=s.begin(); isspace(*begin); ++begin) { }
+  for(end = s.end(); isspace(*end); --end)  { }
+
+  return s.substr(
+    std::distance(s.begin(), begin),
+    s.length() - std::distance(end, s.end())
+  );
+}
+
+std::string nrrd::type(enum dtype t) {
+  switch(t) {
+    case UINT8: return "uint8";
+    case UINT16: return "uint16";
+    case UINT32: return "uint32";
+    case UINT64: return "uint64";
+    case INT8: return "int8";
+    case INT16: return "int16";
+    case INT32: return "int32";
+    case INT64: return "int64";
+    case FLOAT: return "float";
+    case DOUBLE: return "double";
+  }
+  throw std::domain_error("unknown type");
+}
+
 struct nrrd_impl {
   nrrd_impl(const char* fn);
   std::array<uint64_t, 3> dimensions();
@@ -78,19 +107,12 @@ nrrd::dtype nrrd_impl::datatype() {
   throw std::domain_error("unknown nrrd type.");
 }
 
-std::string nrrd_impl::filename() { return this->fn; }
+std::string nrrd_impl::filename() {
+  std::istringstream df(this->value("data file"));
 
-std::string trim(const std::string s) {
-  std::string::const_iterator begin = s.begin();
-  std::string::const_iterator end = s.end();
-
-  for(begin=s.begin(); isspace(*begin); ++begin) { }
-  for(end = s.end(); isspace(*end); --end)  { }
-
-  return s.substr(
-    std::distance(s.begin(), begin),
-    s.length() - std::distance(end, s.end())
-  );
+  std::string f;
+  df >> f;
+  return trim(f);
 }
 
 // case-insensitive match of the key; returns the rest of the line.
@@ -104,7 +126,6 @@ std::string nrrd_impl::value(std::string key) {
     char buffer[512];
     hdr.getline(buffer, 512, ':');
     k = trim(std::string(buffer));
-    std::clog << "read key: '" << k << "'\n";
     hdr.getline(buffer, 512);
     if(k == key) {
       return trim(buffer);
