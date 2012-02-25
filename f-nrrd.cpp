@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include "f-nrrd.h"
+#include "sutil.h"
 
 struct stream_deleter {
   void operator()(std::ifstream* f) const {
@@ -11,19 +12,6 @@ struct stream_deleter {
     f->close();
   }
 };
-
-std::string trim(const std::string s) {
-  std::string::const_iterator begin = s.begin();
-  std::string::const_iterator end = s.end();
-
-  for(begin=s.begin(); isspace(*begin); ++begin) { }
-  for(end = s.end(); isspace(*end); --end)  { }
-
-  return s.substr(
-    std::distance(s.begin(), begin),
-    s.length() - std::distance(end, s.end())
-  );
-}
 
 std::string nrrd::type(enum dtype t) {
   switch(t) {
