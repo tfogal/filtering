@@ -14,7 +14,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utility>
+
 #include <libgen.h>
+#include <boost/pending/disjoint_sets.hpp>
 
 #include "f-nrrd.h"
 #include "sutil.h"
@@ -49,7 +51,8 @@ memory::memory(const char* fn, size_t sz) : fd(-1), map(MAP_FAILED) {
     int err;
     if((err = posix_fallocate(this->fd, 0, sz)) != 0) {
       std::cerr << "fallocate failed, errno=" << err << "\n";
-      ::close(this->fd);
+      this->close();
+      return;
     }
   }
 #endif
@@ -104,6 +107,7 @@ struct stream_deleter {
   void operator()(std::ifstream* f) const {
     std::clog << "Closing stream " << f << "\n";
     f->close();
+    delete f;
   }
 };
 
@@ -148,6 +152,45 @@ std::string config::value(std::string key) {
   throw std::runtime_error("key not found");
 }
 
+// identifies the set of equivalences which should be considered equal
+// expects to parse something of the form:
+//    { range a b }
+// or:
+//    { a b c }
+// The former means the values 'a' through 'b' are the same.
+// The latter means that a, b, and c should all be considered the same value
+std::set<int64_t> equivalences(std::istream& is)
+{
+  std::string junk;
+  std::string value;
+
+  std::set<int64_t> equiv;
+  is >> junk; // leading "{"
+  is >> value;
+  if(value == "range") { //  parse range values
+    int64_t lower, upper;
+    is >> lower >> upper;
+    for(int64_t i=lower; i < upper; ++i) {
+      equiv.insert(i);
+    }
+  } else { // parse out set
+    int64_t v;
+    // 'value' is an actual value.. convert it to an integer and add it.
+    std::istringstream c(value);
+    c >> v;
+    equiv.insert(v);
+    // now convert all the rest of the values
+    while(is) {
+      is >> v;
+      if(is) {
+        equiv.insert(v);
+      }
+    }
+  }
+  is >> junk; // trailing "}"
+  return equiv;
+}
+
 int main(int argc, char* argv[])
 {
   if(argc != 2) {
@@ -159,11 +202,122 @@ int main(int argc, char* argv[])
 
   nrrd innhdr(cfg.value("in").c_str());
   assert(innhdr.n_dimensions() == 3); // can't handle more, right now.
-  std::array<uint64_t,3> dims = innhdr.dimensions();
+  const std::array<uint64_t,3> dims = innhdr.dimensions();
 
   const uint64_t bytes = std::accumulate(dims.begin(), dims.end(),
                                          sizeof(uint8_t),
                                          std::multiplies<uint64_t>());
+  std::ifstream in(innhdr.filename().c_str(), std::ios::binary | std::ios::in);
+  std::istringstream iss(cfg.value("component"));
+  const std::set<int64_t> equivs = equivalences(iss);
+
+  std::clog << "Creating '" << cfg.value("outraw") << "' output file.\n";
+  memory out(cfg.value("outraw").c_str(), bytes);
+  uint8_t* labels = static_cast<uint8_t*>(out.map);
+  std::clog << "Zeroing out map...\n";
+  std::fill(labels, labels+bytes, 0);
+
+  auto valid_coordinate = [=](std::array<int64_t,3> d) {
+    std::array<int64_t,3> ds;
+    std::copy(dims.begin(), dims.end(), ds.begin());
+    assert(std::accumulate(ds.begin(), ds.end(), 0, std::plus<int64_t>()) > 0);
+    return 0 <= d[0] && d[0] < ds[0] &&
+           0 <= d[1] && d[1] < ds[1] &&
+           0 <= d[2] && d[2] < ds[2];
+  };
+  auto idx = [&](std::array<int64_t,3> d) {
+    assert(valid_coordinate(d));
+    return d[2]*(dims[0]*dims[1]) + d[1]*(dims[0]) + d[0];
+  };
+  auto value = [&](std::array<int64_t,3> d) {
+    // for now, we can only deal with 8bit data!
+    // this is because it's a PITA otherwise: what type does this function
+    // return?  it should return the type of the nrrd we are reading from.
+    // but that means we need to templatize it.  templatized lambdas don't
+    // exist.
+    assert(innhdr.datatype() == nrrd::UINT8);
+    in.seekg(idx(d));
+    uint8_t v;
+    in.read(reinterpret_cast<char*>(&v), sizeof(uint8_t));
+    /// @todo once we support multi-byte data, we probably want to do
+    /// endianness conversion here.
+    return v;
+  };
+  // true if the values at these two locations are the same, via the definition
+  // of equality given in the config file.
+  auto equal = [&](std::array<int64_t,3> a, std::array<int64_t,3> b) {
+    return equivs.count(value(a)) > 0 && equivs.count(value(b)) > 0;
+  };
+
+  std::vector<int> rank(255);
+  std::vector<int> parent(255);
+  boost::disjoint_sets<int*,int*> ds(&rank[0], &parent[0]);
+
+  uint8_t identifier = 0;
+  std::clog << "Pass 1...\n";
+  for(uint64_t z=0; z < dims[2]; ++z) {
+    for(uint64_t y=0; y < dims[1]; ++y) {
+      for(uint64_t x=0; x < dims[0]; ++x) {
+        std::clog << "\r" << idx({{x,y,z}}) << " / "
+                  << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
+                  << static_cast<double>(idx({{x,y,z}})) /
+                     idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
+                  << "%)...";
+        // voxel to the left have the same value?
+        if(valid_coordinate({{x-1,y,z}}) && equal({{x-1,y,z}}, {{x,y,z}})) {
+          // then copy its label
+          labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
+          continue;
+        }
+        // left and above have the same value, but different label?
+        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
+           equal({{x-1,y,z}}, {{x,y-1,z}}) &&
+           labels[idx({{x-1,y,z}})] != labels[idx({{x,y-1,z}})]) {
+          // merge left+above voxels, and assign min label to this voxel
+          labels[idx({{x,y,z}})] = std::min(labels[idx({{x-1,y,z}})],
+                                            labels[idx({{x,y-1,z}})]);
+          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
+        }
+        // left different value, above same value.
+        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
+           !equal({{x-1,y,z}}, {{x,y,z}}) &&
+            equal({{x,y-1,z}}, {{x,y,z}})) {
+          // then copy the label from the voxel above
+          labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
+        }
+        // left + above are different values completely?
+        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
+           !equal({{x-1,y,z}}, {{x,y-1,z}})) {
+          // create new identifier
+          labels[idx({{x,y,z}})] = identifier++;
+        }
+      }
+    }
+  }
+  std::clog << "\r" << "                                                     ";
+  std::clog << "\r" << idx({{dims[0]-1,dims[1]-1,dims[2]-1}}) << " / "
+            << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
+            << static_cast<double>(idx({{dims[0]-1,dims[1]-1,dims[2]-1}})) /
+               idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
+            << "%)...\n";
+  std::clog << "Pass 2...\n";
+  for(uint64_t z=0; z < dims[2]; ++z) {
+    for(uint64_t y=0; y < dims[1]; ++y) {
+      for(uint64_t x=0; x < dims[0]; ++x) {
+        labels[idx({{x,y,z}})] = ds.find_set(labels[idx({{x,y,z}})]);
+      }
+    }
+  }
+  out.close();
+
+  std::ofstream onhdr(cfg.value("outnhdr").c_str(), std::ios::out);
+  onhdr << "NRRD0002\n"
+        << "dimension: 3\n"
+        << "sizes: " << dims[0] << " " << dims[1] << " " << dims[2] << "\n"
+        << "type: " << "uint8" << "\n"
+        << "encoding: raw\n"
+        << "data file: " << cfg.value("outraw") << "\n";
+  onhdr.close();
 
   return EXIT_SUCCESS;
 }
