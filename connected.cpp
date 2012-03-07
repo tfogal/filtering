@@ -256,14 +256,19 @@ int main(int argc, char* argv[])
 
   uint8_t identifier = 0;
   std::clog << "Pass 1...\n";
+  #pragma omp parallel for
   for(uint64_t z=0; z < dims[2]; ++z) {
     for(uint64_t y=0; y < dims[1]; ++y) {
       for(uint64_t x=0; x < dims[0]; ++x) {
-        std::clog << "\r" << idx({{x,y,z}}) << " / "
-                  << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
-                  << static_cast<double>(idx({{x,y,z}})) /
-                     idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
-                  << "%)...";
+#if 1
+        if(idx({{x,y,z}}) % 1000 == 0 && omp_get_thread_num() == 0) {
+          std::clog << "\r" << idx({{x,y,z}}) << " / "
+                    << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
+                    << static_cast<double>(idx({{x,y,z}})) /
+                       idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
+                    << "%)...";
+        }
+#endif
         // is this voxel the one to merge all 3 neighbors?
         if(cequal({{x-1,y,z}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}}) &&
            cequal({{x,y,z-1}}, {{x,y,z}})) {
@@ -308,7 +313,10 @@ int main(int argc, char* argv[])
         }
 
         // merges nobody, then!  assign a new label.
-        labels[idx({{x,y,z}})] = identifier++;
+        #pragma omp critical
+        {
+          labels[idx({{x,y,z}})] = identifier++;
+        }
       }
     }
   }

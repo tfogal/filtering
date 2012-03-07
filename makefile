@@ -5,7 +5,7 @@ LIBS=-ltiff
 all: $(OBJ) threshold ccom
 
 threshold: threshold.o f-nrrd.o sutil.o
-	$(CXX) $^ -o $@ $(LIBS)
+	$(CXX) -fopenmp $^ -o $@ $(LIBS)
 
 ccom: connected.o f-nrrd.o sutil.o
 	$(CXX) $^ -o $@ $(LIBS)
