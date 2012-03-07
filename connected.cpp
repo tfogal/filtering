@@ -197,6 +197,13 @@ int main(int argc, char* argv[])
   assert(innhdr.n_dimensions() == 3); // can't handle more, right now.
   const std::array<uint64_t,3> dims = innhdr.dimensions();
 
+  // for now, we can only deal with 8bit data!
+  // this is because it's a PITA otherwise: what type does this function
+  // return?  it should return the type of the nrrd we are reading from.
+  // but that means we need to templatize it.  templatized lambdas don't
+  // exist.
+  assert(innhdr.datatype() == nrrd::UINT8);
+
   const uint64_t bytes = std::accumulate(dims.begin(), dims.end(),
                                          sizeof(uint8_t),
                                          std::multiplies<uint64_t>());
@@ -223,12 +230,6 @@ int main(int argc, char* argv[])
     return d[2]*(dims[0]*dims[1]) + d[1]*(dims[0]) + d[0];
   };
   auto value = [&](std::array<int64_t,3> d) {
-    // for now, we can only deal with 8bit data!
-    // this is because it's a PITA otherwise: what type does this function
-    // return?  it should return the type of the nrrd we are reading from.
-    // but that means we need to templatize it.  templatized lambdas don't
-    // exist.
-    assert(innhdr.datatype() == nrrd::UINT8);
     in.seekg(idx(d));
     uint8_t v;
     in.read(reinterpret_cast<char*>(&v), sizeof(uint8_t));
