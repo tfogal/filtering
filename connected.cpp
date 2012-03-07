@@ -19,6 +19,7 @@
 #include <boost/pending/disjoint_sets.hpp>
 
 #include "f-nrrd.h"
+#include "nonstd.h"
 #include "sutil.h"
 
 struct array_deleter {
@@ -103,14 +104,6 @@ void memory::close() {
   this->fd = -1;
 }
 
-struct stream_deleter {
-  void operator()(std::ifstream* f) const {
-    std::clog << "Closing stream " << f << "\n";
-    f->close();
-    delete f;
-  }
-};
-
 class config {
   public:
     /// @param file is the configuration file
@@ -121,7 +114,7 @@ class config {
     virtual std::string value(std::string key);
 
   private:
-    std::unique_ptr<std::ifstream, stream_deleter> cfg;
+    std::unique_ptr<std::ifstream, nonstd::stream_deleter> cfg;
     const char delimiter;
 };
 

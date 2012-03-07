@@ -4,14 +4,8 @@
 #include <stdexcept>
 #include <string>
 #include "f-nrrd.h"
+#include "nonstd.h"
 #include "sutil.h"
-
-struct stream_deleter {
-  void operator()(std::ifstream* f) const {
-    std::clog << "Closing stream " << f << "\n";
-    f->close();
-  }
-};
 
 std::string nrrd::type(enum dtype t) {
   switch(t) {
@@ -40,7 +34,7 @@ struct nrrd_impl {
   std::string value(std::string key);
 
   std::string fn;
-  std::unique_ptr<std::ifstream, stream_deleter> nhdr;
+  std::unique_ptr<std::ifstream, nonstd::stream_deleter> nhdr;
 };
 
 nrrd_impl::nrrd_impl(const char* f) : fn(f), nhdr(new std::ifstream(f)) {
