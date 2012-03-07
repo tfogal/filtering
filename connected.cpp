@@ -248,6 +248,13 @@ int main(int argc, char* argv[])
   auto equal = [&](std::array<int64_t,3> a, std::array<int64_t,3> b) {
     return equivs.count(value(a)) > 0 && equivs.count(value(b)) > 0;
   };
+  // true iff equal AND the coordinates are valid.
+  // "c"equal -- "coordinate" equal
+  auto cequal = [&](std::array<int64_t,3> a, std::array<int64_t,3> b) {
+    if(!valid_coordinate(a)) { return false; }
+    if(!valid_coordinate(b)) { return false; }
+    return equal(a,b);
+  };
 
   std::vector<int> rank(255);
   std::vector<int> parent(255);
@@ -263,34 +270,51 @@ int main(int argc, char* argv[])
                   << static_cast<double>(idx({{x,y,z}})) /
                      idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
                   << "%)...";
-        // voxel to the left have the same value?
-        if(valid_coordinate({{x-1,y,z}}) && equal({{x-1,y,z}}, {{x,y,z}})) {
-          // then copy its label
+        // is this voxel the one to merge all 3 neighbors?
+        if(cequal({{x-1,y,z}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}}) &&
+           cequal({{x,y,z-1}}, {{x,y,z}})) {
+          // just copy left label; they'll all be unioned anyway, so it won't
+          // matter, we'll clean it up in the second pass.
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
+          // (left equiv above) and (above equiv behind)
+          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
+          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z-1}})]);
           continue;
         }
-        // left and above have the same value, but different label?
-        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
-           equal({{x-1,y,z}}, {{x,y-1,z}}) &&
-           labels[idx({{x-1,y,z}})] != labels[idx({{x,y-1,z}})]) {
-          // merge left+above voxels, and assign min label to this voxel
-          labels[idx({{x,y,z}})] = std::min(labels[idx({{x-1,y,z}})],
-                                            labels[idx({{x,y-1,z}})]);
-          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
+
+        // merge any two neighbors?  z-1&y-1, z-1&x-1, y-1&x-1
+        // z-1&y-1
+        if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}})) {
+          labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
+          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y-1,z}})]);
+          continue;
         }
-        // left different value, above same value.
-        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
-           !equal({{x-1,y,z}}, {{x,y,z}}) &&
-            equal({{x,y-1,z}}, {{x,y,z}})) {
-          // then copy the label from the voxel above
+        // z-1&x-1
+        if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
+          labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
+          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x-1,y,z}})]);
+          continue;
+        }
+        // y-1&x-1
+        if(cequal({{x,y-1,z}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
+          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x-1,y,z}})]);
+          continue;
         }
-        // left + above are different values completely?
-        if(valid_coordinate({{x-1,y,z}}) && valid_coordinate({{x,y-1,z}}) &&
-           !equal({{x-1,y,z}}, {{x,y-1,z}})) {
-          // create new identifier
-          labels[idx({{x,y,z}})] = identifier++;
+
+        // merge any one neighbor?
+        if(cequal({{x-1,y,z}}, {{x,y,z}})) { // x, left neighbor
+          labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})]; continue;
         }
+        if(cequal({{x,y-1,z}}, {{x,y,z}})) { // y, neighbor underneath
+          labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})]; continue;
+        }
+        if(cequal({{x,y,z-1}}, {{x,y,z}})) { // z, neighbor behind
+          labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})]; continue;
+        }
+
+        // merges nobody, then!  assign a new label.
+        labels[idx({{x,y,z}})] = identifier++;
       }
     }
   }
