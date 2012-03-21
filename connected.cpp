@@ -194,53 +194,73 @@ int main(int argc, char* argv[])
                     << "%)...";
         }
 #endif
+        std::cout << "voxel: " << (uint32_t)value({{x,y,z}}) << " ";
         // is this voxel the one to merge all 3 neighbors?
         if(cequal({{x-1,y,z}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}}) &&
            cequal({{x,y,z-1}}, {{x,y,z}})) {
+          std::cout << "merges all three neighbors!\n";
           // just copy left label; they'll all be unioned anyway, so it won't
           // matter, we'll clean it up in the second pass.
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
-          // (left equiv above) and (above equiv behind)
+          // (left equiv above) and (above equiv behind) and (left equiv this)
           ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
           ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z-1}})]);
+          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
 
         // merge any two neighbors?  z-1&y-1, z-1&x-1, y-1&x-1
         // z-1&y-1
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}})) {
+          std::cout << "merges the z-1 AND y-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
           ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y-1,z}})]);
+          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
         }
         // z-1&x-1
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
+          std::cout << "merges the z-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
           ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x-1,y,z}})]);
+          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
         }
         // y-1&x-1
         if(cequal({{x,y-1,z}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
+          std::cout << "merges the y-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
           ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x-1,y,z}})]);
+          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
 
         // merge any one neighbor?
         if(cequal({{x-1,y,z}}, {{x,y,z}})) { // x, left neighbor
-          labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})]; continue;
+          std::cout << "merges the x-1 neighbor!\n";
+          labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
+          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
+          continue;
         }
         if(cequal({{x,y-1,z}}, {{x,y,z}})) { // y, neighbor underneath
-          labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})]; continue;
+          std::cout << "merges the y-1 neighbor!\n";
+          labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
+          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
+          continue;
         }
         if(cequal({{x,y,z-1}}, {{x,y,z}})) { // z, neighbor behind
-          labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})]; continue;
+          std::cout << "merges the z-1 neighbor!\n";
+          labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
+          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
+          continue;
         }
 
         // merges nobody, then!  assign a new label.
         #pragma omp critical
         {
+          std::cout << "merges nobody.  assigning new label ";
           labels[idx({{x,y,z}})] = identifier++;
+          std::cout << identifier << "\n";
         }
       }
     }

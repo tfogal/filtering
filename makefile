@@ -1,4 +1,4 @@
-CXXFLAGS=-g -std=c++0x -Wall -Wextra -fopenmp
+CXXFLAGS=-g -std=c++0x -Wall -Wextra
 OBJ=threshold.o f-nrrd.o connected.o sutil.o mmap-memory.o
 LIBS=-ltiff
 
