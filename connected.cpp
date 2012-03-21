@@ -169,6 +169,7 @@ int main(int argc, char* argv[])
   // true iff equal AND the coordinates are valid.
   // "c"equal -- "coordinate" equal
   auto cequal = [&](std::array<int64_t,3> a, std::array<int64_t,3> b) {
+    assert(valid_coordinate(a) || valid_coordinate(b));
     if(!valid_coordinate(a)) { return false; }
     if(!valid_coordinate(b)) { return false; }
     return equal(a,b);
