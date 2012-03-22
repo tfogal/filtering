@@ -1,6 +1,8 @@
 #ifndef TJF_MMAP_MEMORY_H
 #define TJF_MMAP_MEMORY_H
 
+#include <sys/mman.h>
+
 /// mmap-backed memory
 struct memory {
   memory(const char* fn, size_t sz);
