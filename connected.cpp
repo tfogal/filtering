@@ -15,10 +15,10 @@
 #include <sys/types.h>
 #include <utility>
 
-#include <boost/pending/disjoint_sets.hpp>
 #include <libgen.h>
 #include <omp.h>
 
+#include "disjointset.h"
 #include "f-nrrd.h"
 #include "mmap-memory.h"
 #include "nonstd.h"
@@ -175,9 +175,7 @@ int main(int argc, char* argv[])
     return equal(a,b);
   };
 
-  std::vector<int> rank(255);
-  std::vector<int> parent(255);
-  boost::disjoint_sets<int*,int*> ds(&rank[0], &parent[0]);
+  DisjointSet ds;
 
   uint8_t identifier = 0;
   std::clog << "Pass 1...\n";
@@ -203,9 +201,9 @@ int main(int argc, char* argv[])
           // matter, we'll clean it up in the second pass.
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
           // (left equiv above) and (above equiv behind) and (left equiv this)
-          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
-          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z-1}})]);
-          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x-1,y,z}})], labels[idx({{x,y-1,z}})]);
+          ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z-1}})]);
+          ds.unio(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
 
@@ -214,24 +212,24 @@ int main(int argc, char* argv[])
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}})) {
           std::cout << "merges the z-1 AND y-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
-          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y-1,z}})]);
-          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y-1,z}})]);
+          ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
         }
         // z-1&x-1
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
           std::cout << "merges the z-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
-          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x-1,y,z}})]);
-          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x-1,y,z}})]);
+          ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
         }
         // y-1&x-1
         if(cequal({{x,y-1,z}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
           std::cout << "merges the y-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
-          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x-1,y,z}})]);
-          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x-1,y,z}})]);
+          ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
 
@@ -239,19 +237,19 @@ int main(int argc, char* argv[])
         if(cequal({{x-1,y,z}}, {{x,y,z}})) { // x, left neighbor
           std::cout << "merges the x-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
-          ds.union_set(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
         if(cequal({{x,y-1,z}}, {{x,y,z}})) { // y, neighbor underneath
           std::cout << "merges the y-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
-          ds.union_set(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
         if(cequal({{x,y,z-1}}, {{x,y,z}})) { // z, neighbor behind
           std::cout << "merges the z-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
-          ds.union_set(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
+          ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
         }
 
@@ -260,6 +258,7 @@ int main(int argc, char* argv[])
         {
           std::cout << "merges nobody.  assigning new label ";
           labels[idx({{x,y,z}})] = identifier++;
+          ds.unio(labels[idx({{x,y,z}})], labels[idx({{x,y,z}})]);
           std::cout << identifier << "\n";
         }
       }
@@ -272,10 +271,13 @@ int main(int argc, char* argv[])
                idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
             << "%)...\n";
   std::clog << "Pass 2...\n";
+  std::cout << "components:\n";
+  ds.print();
+  std::cout << "\n";
   for(uint64_t z=0; z < dims[2]; ++z) {
     for(uint64_t y=0; y < dims[1]; ++y) {
       for(uint64_t x=0; x < dims[0]; ++x) {
-        labels[idx({{x,y,z}})] = ds.find_set(labels[idx({{x,y,z}})]);
+        labels[idx({{x,y,z}})] = ds.find(labels[idx({{x,y,z}})]);
       }
     }
   }
