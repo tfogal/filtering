@@ -51,7 +51,7 @@ struct dset_impl {
   // if such a set was not found.
   std::list<std::set<int>>::iterator findset(int a) {
     return std::find_if(sets.begin(), sets.end(),
-                        [&](const std::set<int>& s) -> bool {
+                        [=](const std::set<int>& s) -> bool {
                           return s.find(a) != s.end();
                         });
   }

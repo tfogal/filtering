@@ -185,18 +185,16 @@ int main(int argc, char* argv[])
       for(uint64_t x=0; x < dims[0]; ++x) {
 #if 1
         if(idx({{x,y,z}}) % 1000 == 0 && omp_get_thread_num() == 0) {
-          std::clog << "\r" << idx({{x,y,z}}) << " / "
-                    << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
-                    << static_cast<double>(idx({{x,y,z}})) /
-                       idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
-                    << "%)...";
+          auto cur = idx({{x,y,z}});
+          auto last = idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) /
+                      omp_get_num_threads();
+          std::clog << "\r" << cur << " / " << last << " ("
+                    << static_cast<double>(cur) / last * 100.0 << "%)...";
         }
 #endif
-        std::cout << "voxel: " << (uint32_t)value({{x,y,z}}) << " ";
         // is this voxel the one to merge all 3 neighbors?
         if(cequal({{x-1,y,z}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}}) &&
            cequal({{x,y,z-1}}, {{x,y,z}})) {
-          std::cout << "merges all three neighbors!\n";
           // just copy left label; they'll all be unioned anyway, so it won't
           // matter, we'll clean it up in the second pass.
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
@@ -210,7 +208,6 @@ int main(int argc, char* argv[])
         // merge any two neighbors?  z-1&y-1, z-1&x-1, y-1&x-1
         // z-1&y-1
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}})) {
-          std::cout << "merges the z-1 AND y-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
           ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y-1,z}})]);
           ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
@@ -218,7 +215,6 @@ int main(int argc, char* argv[])
         }
         // z-1&x-1
         if(cequal({{x,y,z-1}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
-          std::cout << "merges the z-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
           ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x-1,y,z}})]);
           ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
@@ -226,7 +222,6 @@ int main(int argc, char* argv[])
         }
         // y-1&x-1
         if(cequal({{x,y-1,z}}, {{x,y,z}}) && cequal({{x-1,y,z}}, {{x,y,z}})) {
-          std::cout << "merges the y-1 AND x-1 neighbors!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
           ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x-1,y,z}})]);
           ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
@@ -235,19 +230,16 @@ int main(int argc, char* argv[])
 
         // merge any one neighbor?
         if(cequal({{x-1,y,z}}, {{x,y,z}})) { // x, left neighbor
-          std::cout << "merges the x-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x-1,y,z}})];
           ds.unio(labels[idx({{x-1,y,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
         if(cequal({{x,y-1,z}}, {{x,y,z}})) { // y, neighbor underneath
-          std::cout << "merges the y-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y-1,z}})];
           ds.unio(labels[idx({{x,y-1,z}})], labels[idx({{x,y,z}})]);
           continue;
         }
         if(cequal({{x,y,z-1}}, {{x,y,z}})) { // z, neighbor behind
-          std::cout << "merges the z-1 neighbor!\n";
           labels[idx({{x,y,z}})] = labels[idx({{x,y,z-1}})];
           ds.unio(labels[idx({{x,y,z-1}})], labels[idx({{x,y,z}})]);
           continue;
@@ -256,20 +248,19 @@ int main(int argc, char* argv[])
         // merges nobody, then!  assign a new label.
         #pragma omp critical
         {
-          std::cout << "merges nobody.  assigning new label ";
           labels[idx({{x,y,z}})] = identifier++;
           ds.unio(labels[idx({{x,y,z}})], labels[idx({{x,y,z}})]);
-          std::cout << identifier << "\n";
         }
       }
     }
   }
   std::clog << "\r" << "                                                     ";
-  std::clog << "\r" << idx({{dims[0]-1,dims[1]-1,dims[2]-1}}) << " / "
-            << idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) << " ("
-            << static_cast<double>(idx({{dims[0]-1,dims[1]-1,dims[2]-1}})) /
-               idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) * 100.0f
-            << "%)...\n";
+  {
+    auto last = idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) /
+                omp_get_num_threads();
+    std::clog << "\r" << last << " / " << last << " ("
+              << static_cast<double>(last) / last * 100.0 << "%)...";
+  }
   std::clog << "Pass 2...\n";
   std::cout << "components:\n";
   ds.print();

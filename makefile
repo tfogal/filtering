@@ -1,4 +1,4 @@
-CXXFLAGS=-g -std=c++0x -Wall -Wextra -Wdisabled-optimization
+CXXFLAGS=-g -std=c++0x -Wall -Wextra -Wdisabled-optimization -fopenmp -O3
 OBJ=threshold.o f-nrrd.o connected.o sutil.o mmap-memory.o disjointset.o
 LIBS=-ltiff
 
