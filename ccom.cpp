@@ -193,7 +193,7 @@ void ccom(const char* fn_config) {
     }
   }
   std::clog << "\r" << "                                                     ";
-  {
+  if(bytes > 0) {
     auto last = idx({{dims[0]-1, dims[1]-1, dims[2]-1}}) /
                 omp_get_num_threads();
     std::clog << "\r" << last << " / " << last << " ("
