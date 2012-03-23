@@ -79,6 +79,16 @@ void ccom(const char* fn_config) {
   std::clog << "Zeroing out map...\n";
   std::fill(labels, labels+bytes, 0);
 
+
+  // CURRENT ISSUE:
+  // what are the semantics for values in/out of the range?
+  // if we have a 1D DS of: 42 42 42 19 19 19 and the range is given as 0
+  // through 20.. we want the result to be 0 0 0 1 1 1.  So I guess that means
+  // we should just *first* check whether a value is in the range, and if not
+  // then set it to 0 and move on.  But then the case: 19 19 19 42 42 42
+  // would end up as all zeroes, as the first identifier is 0.  So I guess we
+  // should just start the identifiers at 1, then.
+
   auto valid_coordinate = [=](std::array<int64_t,3> d) {
     std::array<int64_t,3> ds;
     std::copy(dims.begin(), dims.end(), ds.begin());
