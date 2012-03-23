@@ -17,7 +17,7 @@ memory::memory(const char* fn, size_t sz) : fd(-1), map(MAP_FAILED) {
   {
     int err;
     if((err = posix_fallocate(this->fd, 0, sz)) != 0) {
-      std::cerr << "fallocate failed, errno=" << err << "\n";
+      std::cerr << "fallocate failed, err=" << err << "\n";
       this->close();
       return;
     }

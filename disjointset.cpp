@@ -60,8 +60,8 @@ struct dset_impl {
   void print() {
     for(const std::set<int>& s : sets) {
       std::copy(s.begin(), s.end(),
-                std::ostream_iterator<int>(std::cout, " "));
-      std::cout << "\n";
+                std::ostream_iterator<int>(std::clog, " "));
+      std::clog << "\n";
     }
   }
 

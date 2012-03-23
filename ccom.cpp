@@ -199,10 +199,10 @@ void ccom(const char* fn_config) {
     std::clog << "\r" << last << " / " << last << " ("
               << static_cast<double>(last) / last * 100.0 << "%)...\n";
   }
-  std::clog << "Pass 2...\n";
-  std::cout << "components:\n";
+  std::clog << "\rPass 2...\n";
+  std::clog << "components:\n";
   ds.print();
-  std::cout << "\n";
+  std::clog << "\n";
   for(uint64_t z=0; z < dims[2]; ++z) {
     for(uint64_t y=0; y < dims[1]; ++y) {
       for(uint64_t x=0; x < dims[0]; ++x) {
