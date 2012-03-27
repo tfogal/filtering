@@ -11,7 +11,7 @@ TESTING_OBJ=\
   ccom-suite.o \
   main.o
 OBJ=$(TESTING_OBJ)
-LIBS=-ltiff -lcpptest
+LIBS=-ltiff -lcppunit
 
 all: $(OBJ) testing
 

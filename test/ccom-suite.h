@@ -1,21 +1,20 @@
 #ifndef TJF_CCOM_SUITE_H
 #define TJF_CCOM_SUITE_H
 #include <memory>
-#include <cpptest.h>
+#include <cppunit/TestFixture.h>
 
-class CComSuite : public Test::Suite {
+class CComSuite : public CppUnit::TestFixture {
   public:
     CComSuite();
+    virtual ~CComSuite();
 
-  protected:
-    virtual void setup();
-    virtual void tear_down();
+    virtual void setUp();
+    virtual void tearDown();
 
-  private:
     void test_empty();
     void test_single();
-    void test_twovalues();
-    class nullbuf;
-    std::unique_ptr<nullbuf> nb;
+    void test_twovalues_merged();
+    void test_twovalues_separate();
+    void test_2d_separate();
 };
 #endif /* TJF_CCOM_SUITE_H */
