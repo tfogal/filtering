@@ -125,7 +125,7 @@ void ccom(const char* fn_config) {
 
   DisjointSet ds;
 
-  uint8_t identifier = 0;
+  uint8_t identifier = 1;
   std::clog << "Pass 1...\n";
   #pragma omp parallel for
   for(uint64_t z=0; z < dims[2]; ++z) {
@@ -140,6 +140,12 @@ void ccom(const char* fn_config) {
                     << static_cast<double>(cur) / last * 100.0 << "%)...";
         }
 #endif
+        // our function may decide this is background.
+        if(equivs.count(value({{x,y,z}})) == 0) {
+          labels[idx({{x,y,z}})] = 0;
+          continue;
+        }
+
         // is this voxel the one to merge all 3 neighbors?
         if(cequal({{x-1,y,z}}, {{x,y,z}}) && cequal({{x,y-1,z}}, {{x,y,z}}) &&
            cequal({{x,y,z-1}}, {{x,y,z}})) {
@@ -216,7 +222,10 @@ void ccom(const char* fn_config) {
   for(uint64_t z=0; z < dims[2]; ++z) {
     for(uint64_t y=0; y < dims[1]; ++y) {
       for(uint64_t x=0; x < dims[0]; ++x) {
-        labels[idx({{x,y,z}})] = ds.find(labels[idx({{x,y,z}})]);
+        // 0 is special; it's a known separator.
+        if(labels[idx({{x,y,z}})] != 0) {
+          labels[idx({{x,y,z}})] = ds.find(labels[idx({{x,y,z}})]);
+        }
       }
     }
   }
